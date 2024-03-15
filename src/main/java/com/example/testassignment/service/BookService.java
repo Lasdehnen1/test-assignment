@@ -17,8 +17,8 @@ import java.util.stream.Collectors;
 @Service
 public class BookService {
     private List<Book> books;
-
-    String csvFile = "C:\\Users\\79154\\Desktop\\goodreads_top100_from1980to2023_final.csv";
+    @Value("${csv.file}")
+    private String csvFile;
 
     public List<Book> getTopTen(Integer year, String column, String sort) {
         books = readCSV(csvFile);
