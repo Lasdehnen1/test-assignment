@@ -29,6 +29,7 @@ public class BookService {
                     .filter(book -> book.getPublicationDate().getYear() == year)
                     .collect(Collectors.toList());
         }
+
         Comparator<Book> comparator = null;
         switch (column) {
             case "book":
@@ -38,19 +39,22 @@ public class BookService {
                 comparator = Comparator.comparing(Book::getAuthor);
                 break;
             case "numPages":
-                comparator = Comparator.comparing(Book::getNumPages);
+                comparator = Comparator.comparing(Book::getNumPages, Comparator.nullsLast(Comparator.naturalOrder()));
                 break;
             case "publicationDate":
-                comparator = Comparator.comparing(Book::getPublicationDate);
+                comparator = Comparator.comparing(Book::getPublicationDate, Comparator.nullsLast(Comparator.naturalOrder()));
                 break;
             case "rating":
-                comparator = Comparator.comparing(Book::getRating);
+                comparator = Comparator.comparing(Book::getRating, Comparator.nullsLast(Comparator.naturalOrder()));
                 break;
             case "numberOfVoters":
-                comparator = Comparator.comparing(Book::getNumberOfVoters);
+                comparator = Comparator.comparing(Book::getNumberOfVoters, Comparator.nullsLast(Comparator.naturalOrder()));
                 break;
             default:
                 return null;
+        }
+        if (!sort.equalsIgnoreCase("ASC") && !sort.equalsIgnoreCase("DESC")) {
+            throw new IllegalArgumentException("Invalid sort argument. Use only DESC or ASC");
         }
         if (comparator != null) {
             if (sort.equalsIgnoreCase("DESC")) {
@@ -60,56 +64,95 @@ public class BookService {
         } else {
             return null;
         }
-        List<Book> topTen = filteredBooks.subList(0, Math.min(10, filteredBooks.size()));
-
+        // Исключение книги со значением null из результирующего списка только при сортировке по указанным полям
+        if (column.equals("book") || column.equals("author") || column.equals("publicationDate") || column.equals("rating") || column.equals("numberOfVoters")) {
+            filteredBooks = filteredBooks.stream().filter(book -> getFieldValueByColumn(book, column) != null).collect(Collectors.toList());
+        }
+        List<Book> topTen = filteredBooks.stream().limit(10).collect(Collectors.toList());
         return topTen;
     }
 
+    private Comparable<?> getFieldValueByColumn(Book book, String column) {
+        switch (column) {
+            case "book":
+                return book.getBook();
+            case "author":
+                return book.getAuthor();
+            case "numPages":
+                return book.getNumPages();
+            case "publicationDate":
+                return book.getPublicationDate();
+            case "rating":
+                return book.getRating();
+            case "numberOfVoters":
+                return book.getNumberOfVoters();
+            default:
+                return null;
+        }
+    }
+
     public List<Book> readCSV(String csvFilePath) {
+        List<String[]> csvData = null;
+        try (CSVReader reader = new CSVReaderBuilder(new FileReader(csvFilePath)).withSkipLines(1).build()) {
+            csvData = reader.readAll();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        if (csvData == null || csvData.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        return createBooksFromCSV(csvData);
+    }
+
+    private List<Book> createBooksFromCSV(List<String[]> csvData) {
         List<Book> books = new ArrayList<>();
-        try (CSVReader reader = new CSVReaderBuilder(new FileReader(csvFilePath)).withSkipLines(1) // пропускаем заголовок
-                .build()) {
-            String[] nextLine;
-            while ((nextLine = reader.readNext()) != null) {
-
-                Long id = Long.valueOf(nextLine[0]);
-                String bookName = nextLine[2];
-                String series = nextLine[3];
-                String releaseNumber = nextLine[4];
-                String author = nextLine[5];
-                String description = nextLine[8];
-                String numPages = nextLine[9];
-                String format = nextLine[10];
-                List<String> genres = Collections.singletonList(nextLine[11]);
-                String publicationDate = nextLine[12];
-                Double rating = Double.valueOf(nextLine[13]);
-                Long numberOfVoters = Double.valueOf(nextLine[14]).longValue();
-
-                LocalDate localDate = toLocalDate(publicationDate);
-                Integer pages = pagesToInteger(numPages);
-
-
-                Book book = new Book();
-                book.setId(id);
-                book.setBook(bookName);
-                book.setSeries(series);
-                book.setReleaseNumber(releaseNumber);
-                book.setAuthor(author);
-                book.setDescription(description);
-                book.setNumPages(pages);
-                book.setFormat(format);
-                book.setGenres(genres);
-                book.setPublicationDate(localDate);
-                book.setRating(rating);
-                book.setNumberOfVoters(numberOfVoters);
+        for (String[] line : csvData) {
+            Book book = createBookFromCSVLine(line);
+            if (book != null) {
                 books.add(book);
-
             }
+        }
+        return books;
+    }
+
+    private Book createBookFromCSVLine(String[] csvLine) {
+        try {
+            Long id = Long.valueOf(csvLine[0]);
+            String bookName = csvLine[2];
+            String series = csvLine[3];
+            String releaseNumber = csvLine[4];
+            String author = csvLine[5];
+            String description = csvLine[8];
+            String numPages = csvLine[9];
+            String format = csvLine[10];
+            List<String> genres = Collections.singletonList(csvLine[11]);
+            String publicationDate = csvLine[12];
+            Double rating = Double.valueOf(csvLine[13]);
+            Long numberOfVoters = Double.valueOf(csvLine[14]).longValue();
+
+            LocalDate localDate = toLocalDate(publicationDate);
+            Integer pages = pagesToInteger(numPages);
+
+            Book book = new Book();
+            book.setId(id);
+            book.setBook(bookName);
+            book.setSeries(series);
+            book.setReleaseNumber(releaseNumber);
+            book.setAuthor(author);
+            book.setDescription(description);
+            book.setNumPages(pages);
+            book.setFormat(format);
+            book.setGenres(genres);
+            book.setPublicationDate(localDate);
+            book.setRating(rating);
+            book.setNumberOfVoters(numberOfVoters);
+            return book;
         } catch (Exception e) {
             e.printStackTrace();
             return null;
         }
-        return books;
     }
 
     private LocalDate toLocalDate(String dateString) {
