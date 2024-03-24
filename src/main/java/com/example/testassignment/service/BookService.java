@@ -6,6 +6,7 @@ import com.opencsv.CSVReaderBuilder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.PostConstruct;
 import java.io.FileReader;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -20,16 +21,21 @@ public class BookService {
     @Value("${csv.file}")
     private String csvFile;
 
-    public List<Book> getTopTen(Integer year, String column, String sort) {
+    @PostConstruct
+    public void init() {
         books = readCSV(csvFile);
-        List<Book> filteredBooks = new ArrayList<>(books);
-        if (year != null) {
-            filteredBooks = filteredBooks.stream()
-                    .filter(book -> book.getPublicationDate() != null)
-                    .filter(book -> book.getPublicationDate().getYear() == year)
-                    .collect(Collectors.toList());
-        }
-
+    }
+    public List<Book> getTopTen(Integer year, String column, String sort) {
+        return books.stream()
+                .filter(book -> year == null || (book.getPublicationDate() != null && book.getPublicationDate().getYear() == year))
+                .sorted(getComparator(column, sort))
+                .filter(book -> !column.equals("book") && !column.equals("author")
+                        && !column.equals("publicationDate") && !column.equals("rating")
+                        && !column.equals("numberOfVoters") || getFieldValueByColumn(book, column) != null)
+                .limit(10)
+                .collect(Collectors.toList());
+    }
+    private Comparator<Book> getComparator(String column, String sort) {
         Comparator<Book> comparator = null;
         switch (column) {
             case "book":
@@ -56,22 +62,8 @@ public class BookService {
         if (!sort.equalsIgnoreCase("ASC") && !sort.equalsIgnoreCase("DESC")) {
             throw new IllegalArgumentException("Invalid sort argument. Use only DESC or ASC");
         }
-        if (comparator != null) {
-            if (sort.equalsIgnoreCase("DESC")) {
-                comparator = comparator.reversed();
-            }
-            filteredBooks.sort(comparator);
-        } else {
-            return null;
-        }
-        // Исключение книги со значением null из результирующего списка только при сортировке по указанным полям
-        if (column.equals("book") || column.equals("author") || column.equals("publicationDate") || column.equals("rating") || column.equals("numberOfVoters")) {
-            filteredBooks = filteredBooks.stream().filter(book -> getFieldValueByColumn(book, column) != null).collect(Collectors.toList());
-        }
-        List<Book> topTen = filteredBooks.stream().limit(10).collect(Collectors.toList());
-        return topTen;
+        return sort.equalsIgnoreCase("DESC") ? comparator.reversed() : comparator;
     }
-
     private Comparable<?> getFieldValueByColumn(Book book, String column) {
         switch (column) {
             case "book":

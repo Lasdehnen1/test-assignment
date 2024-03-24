@@ -17,6 +17,24 @@ public class Book {
     private Double rating;
     private Long numberOfVoters;
 
+    public Book() {
+    }
+
+    public Book(Long id, String book, String series, String releaseNumber, String author, String description, Integer numPages, String format, List<String> genres, LocalDate publicationDate, Double rating, Long numberOfVoters) {
+        this.id = id;
+        this.book = book;
+        this.series = series;
+        this.releaseNumber = releaseNumber;
+        this.author = author;
+        this.description = description;
+        this.numPages = numPages;
+        this.format = format;
+        this.genres = genres;
+        this.publicationDate = publicationDate;
+        this.rating = rating;
+        this.numberOfVoters = numberOfVoters;
+    }
+
     public Long getId() {
         return id;
     }
